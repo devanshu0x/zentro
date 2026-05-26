@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"github.com/devanshu0x/zentro/parser"
 )
 
 func main(){
@@ -22,5 +23,7 @@ func main(){
 		fmt.Printf("Its a directory path not a file: %s",filePath)
 		return 
 	}
+
+	parser.ReadFile(filePath)
 
 }

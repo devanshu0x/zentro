@@ -1,0 +1,9 @@
+Header size: 32
+Header type: ftyp
+Header size: 32659
+Header type: moov
+Header size: 8
+Header type: free
+Header size: 3928866
+Header type: mdat
+Read the entire file!
