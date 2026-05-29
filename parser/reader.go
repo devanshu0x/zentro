@@ -9,108 +9,6 @@ import (
 	"strings"
 )
 
-type BoxHeader struct {
-	Size uint32
-	Type [4]byte
-}
-
-type FullBox struct {
-	Version uint8
-	Flags   [3]byte
-}
-
-type MovieHeaderv0 struct {
-	CreationTime     uint32
-	ModificationTime uint32
-	Timescale        uint32
-	Duration         uint32
-}
-
-func (m MovieHeaderv0) Print() {
-	fmt.Println("Movie header version 0")
-	fmt.Printf("Creation time: %d\n", m.CreationTime)
-	fmt.Printf("Modification time: %d\n", m.ModificationTime)
-	fmt.Printf("Timescale: %d\n", m.Timescale)
-	fmt.Printf("Duration: %d\n", m.Duration)
-	fmt.Printf("Duration in seconds: %.2f\n", m.GetDurationInSeconds())
-}
-
-func (m MovieHeaderv0) GetDurationInSeconds() float64 {
-	return float64(m.Duration) / float64(m.Timescale)
-}
-
-type MovieHeaderv1 struct {
-	CreationTime     uint64
-	ModificationTime uint64
-	Timescale        uint32
-	Duration         uint64
-}
-
-func (m MovieHeaderv1) Print() {
-	fmt.Println("Movie header version 1")
-	fmt.Printf("Creation time: %d\n", m.CreationTime)
-	fmt.Printf("Modification time: %d\n", m.ModificationTime)
-	fmt.Printf("Timescale: %d\n", m.Timescale)
-	fmt.Printf("Duration: %d\n", m.Duration)
-	fmt.Printf("Duration in seconds: %.2f\n", m.GetDurationInSeconds())
-}
-
-func (m MovieHeaderv1) GetDurationInSeconds() float64 {
-	return float64(m.Duration) / float64(m.Timescale)
-}
-
-func (b BoxHeader) BoxType() string {
-	return string(b.Type[:])
-}
-
-type TrackHeaderv0 struct {
-	CreationTime     uint32
-	ModificationTime uint32
-	TrackId          uint32
-	Reserved1        [4]byte
-	Duration         uint32
-	Reserved2        [8]byte
-	Layer            int16
-	AlternateGroup   int16
-	Volume           int16
-	Reserved3        [2]byte
-	Matrix           [36]byte
-	Width            uint32
-	Height           uint32
-}
-
-func (t TrackHeaderv0) Print() {
-	fmt.Printf("Track Id: %d\n", t.TrackId)
-	actualWidth := float64(t.Width) / (1 << 16)
-	actualHeight := float64(t.Height) / (1 << 16)
-	fmt.Printf("Width: %.2f", actualWidth)
-	fmt.Printf("Height: %.2f", actualHeight)
-}
-
-type TrackHeaderv1 struct {
-	CreationTime     uint64
-	ModificationTime uint64
-	TrackId          uint32
-	Reserved1        [4]byte
-	Duration         uint64
-	Reserved2        [8]byte
-	Layer            int16
-	AlternateGroup   int16
-	Volume           int16
-	Reserved3        [2]byte
-	Matrix           [36]byte
-	Width            uint32
-	Height           uint32
-}
-
-func (t TrackHeaderv1) Print() {
-	fmt.Printf("Track Id: %d", t.TrackId)
-	actualWidth := float64(t.Width) / (1 << 16)
-	actualHeight := float64(t.Height) / (1 << 16)
-	fmt.Printf("Width: %.2f", actualWidth)
-	fmt.Printf("Height: %.2f", actualHeight)
-}
-
 func ReadBlock(file io.Reader, b interface{}) error {
 	err := binary.Read(file, binary.BigEndian, b)
 	return err
@@ -130,7 +28,7 @@ func isContainer(headerType string) bool {
 	return false
 }
 
-func ReadMovieHeaderData(file io.ReadSeeker, end int64) error {
+func ReadHeaderDataVersioned(file io.ReadSeeker, end int64, v0 Printable, v1 Printable) error {
 	fullBox := FullBox{}
 	err := binary.Read(file, binary.BigEndian, &fullBox)
 	if err != nil {
@@ -138,49 +36,31 @@ func ReadMovieHeaderData(file io.ReadSeeker, end int64) error {
 	}
 	switch fullBox.Version {
 	case 0:
-		mvhd := &MovieHeaderv0{}
-		if err := ReadBlock(file, mvhd); err != nil {
-			return fmt.Errorf("Failed to read mvhdv0 struct: %w", err)
+		if err := ReadBlock(file, v0); err != nil {
+			return fmt.Errorf("Failed to read %T struct: %w",v0 ,err)
 		}
-		mvhd.Print()
+		v0.Print()
 
 	case 1:
-		mvhd := &MovieHeaderv1{}
-		if err := ReadBlock(file, mvhd); err != nil {
-			return fmt.Errorf("Failed to read mvhdv1 struct: %w", err)
+		if err := ReadBlock(file, v1); err != nil {
+			return fmt.Errorf("Failed to read %T struct: %w",v1 ,err)
 		}
-		mvhd.Print()
+		v1.Print()
 	}
 
 	_, err = file.Seek(end, io.SeekStart)
 	return err
 }
 
-func ReadTrackHeaderData(file io.ReadSeeker, end int64) error {
-	fullBox := FullBox{}
-	err := binary.Read(file, binary.BigEndian, &fullBox)
-	if err != nil {
-		return fmt.Errorf("Failed to read fullbox: %w", err)
+func ReadHeaderData(file io.ReadSeeker, end int64, h Printable) error {
+	err:=binary.Read(file,binary.BigEndian,h)
+	if err!=nil{
+		return err
 	}
-	switch fullBox.Version {
-	case 0:
-		tkhd := &TrackHeaderv0{}
-		if err := ReadBlock(file, tkhd); err != nil {
-			return fmt.Errorf("Failed to read tkhdv0 struct: %w", err)
-		}
-		tkhd.Print()
-
-	case 1:
-		tkhd := &TrackHeaderv1{}
-		if err := ReadBlock(file, tkhd); err != nil {
-			return fmt.Errorf("Failed to read tkhdv1 struct: %w", err)
-		}
-		tkhd.Print()
-	}
+	h.Print()
 
 	_, err = file.Seek(end, io.SeekStart)
 	return err
-
 }
 
 func ParseBoxes(file io.ReadSeeker, end int64, level int) error {
@@ -211,9 +91,9 @@ func ParseBoxes(file io.ReadSeeker, end int64, level int) error {
 
 			switch boxType := header.BoxType(); boxType {
 			case "mvhd":
-				ReadMovieHeaderData(file, curr+int64(header.Size))
+				ReadHeaderDataVersioned(file, curr+int64(header.Size),&MovieHeaderv0{},&MovieHeaderv1{})
 			case "tkhd":
-				ReadTrackHeaderData(file, curr+int64(header.Size))
+				ReadHeaderDataVersioned(file, curr+int64(header.Size),&TrackHeaderv0{},&TrackHeaderv1{})
 			default:
 				_, err := file.Seek(int64(header.Size)-8, io.SeekCurrent)
 				if err != nil {
