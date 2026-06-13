@@ -76,6 +76,10 @@ func ParseBoxes(file io.ReadSeeker, end int64, level int, ctx *ParseContext) err
 			)
 		}
 
+		if ctx.Verbose{
+			PrintLevel(header,level)
+		}
+
 		boxEnd := curr + int64(header.Size)
 
 		if isContainer(header.BoxType()) {
@@ -134,6 +138,10 @@ func ParseBoxes(file io.ReadSeeker, end int64, level int, ctx *ParseContext) err
 			if err != nil {
 				return err
 			}
+			
+			if ctx.Verbose{
+				PrintLevel(mvhd,level)
+			}
 
 			ctx.Movie.Duration =
 				mvhd.DurationSeconds()
@@ -143,6 +151,10 @@ func ParseBoxes(file io.ReadSeeker, end int64, level int, ctx *ParseContext) err
 			tkhd, err := ParseTkhd(file)
 			if err != nil {
 				return err
+			}
+
+			if ctx.Verbose{
+				PrintLevel(tkhd,level)
 			}
 
 			if ctx.CurrentTrack != nil {
@@ -167,6 +179,10 @@ func ParseBoxes(file io.ReadSeeker, end int64, level int, ctx *ParseContext) err
 				return err
 			}
 
+			if ctx.Verbose{
+				PrintLevel(mdhd,level)
+			}
+
 			if ctx.CurrentTrack != nil {
 
 				ctx.CurrentTrack.Duration =
@@ -181,6 +197,10 @@ func ParseBoxes(file io.ReadSeeker, end int64, level int, ctx *ParseContext) err
 			hdlr, err := ParseHdlr(file)
 			if err != nil {
 				return err
+			}
+
+			if ctx.Verbose{
+				PrintLevel(hdlr,level)
 			}
 
 			if ctx.CurrentTrack != nil {
